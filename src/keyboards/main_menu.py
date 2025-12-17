@@ -3,15 +3,28 @@ from ..config import config
 
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
-    buttons = [
+    """
+    /start pe dikhne wala main inline keyboard.
+    - Serena Channel
+    - Owner Contact
+    - Create / Edit Profile
+    """
+    keyboard = [
         [
-            InlineKeyboardButton("📢 Serena Channel", url=config.channel_link),
             InlineKeyboardButton(
-                "👤 Owner Contact", url=f"https://t.me/{config.owner_username}"
+                text="📢 Serena Channel",
+                url=config.channel_link,
+            ),
+            InlineKeyboardButton(
+                text="👤 Owner Contact",
+                url=f"https://t.me/{config.owner_username}",
             ),
         ],
         [
-            InlineKeyboardButton("📝 Create / Edit Profile", callback_data="create_profile")
+            InlineKeyboardButton(
+                text="📝 Create / Edit Profile",
+                callback_data="create_profile",
+            )
         ],
     ]
-    return InlineKeyboardMarkup(buttons)
+    return InlineKeyboardMarkup(keyboard)
