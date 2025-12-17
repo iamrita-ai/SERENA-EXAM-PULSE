@@ -9,7 +9,6 @@ from telegram.ext import (
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
-    ChannelPostHandler,
     filters,
 )
 
@@ -70,9 +69,12 @@ def main():
     # ---------------- Handlers ---------------- #
 
     # 1) Tumhare EXAM_FEED_CHANNEL ke liye handler:
-    # Sirf channel_post updates handle karega (users ke chats ko affect nahi karega)
+    # Sirf channel type chats (CHANNEL) handle karega.
     application.add_handler(
-        ChannelPostHandler(exam_channel_post_handler)
+        MessageHandler(
+            filters.ChatType.CHANNEL,
+            exam_channel_post_handler,
+        )
     )
 
     # 2) User commands
@@ -105,8 +107,6 @@ def main():
 
     # ---------------- Long Polling (no webhook) ---------------- #
 
-    # Long polling se bot Telegram se updates lega.
-    # Render ka Web Service health check upar wale HTTP server se satisfy ho jayega.
     application.run_polling(
         allowed_updates=["message", "callback_query", "channel_post"],
         drop_pending_updates=True,
