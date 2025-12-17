@@ -4,6 +4,8 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from .config import config
@@ -14,6 +16,7 @@ from .handlers.profile import profile_view_command, PROFILE_CONV_HANDLER
 from .handlers.settings import settings_command, settings_callback
 from .handlers.admin import status_command, users_command, broadcast_command
 from .handlers.jobs import jobs_command
+from .handlers.feed import exam_channel_post_handler
 from .services.scheduler import setup_scheduled_jobs
 
 
@@ -25,6 +28,11 @@ def main():
     application = Application.builder().token(config.bot_token).build()
 
     # ---------------- Handlers ---------------- #
+
+    # Channel exam feed handler (must be before generic message handlers, but yahan koi generic nahi)
+    application.add_handler(
+        MessageHandler(filters.ALL, exam_channel_post_handler)
+    )
 
     # User commands
     application.add_handler(CommandHandler("start", start_command))
@@ -56,19 +64,13 @@ def main():
 
     # ---------------- Webhook Config for Render ---------------- #
 
-    # Render automatically PORT env var set karta hai
     port = int(os.getenv("PORT", "8000"))
-
-    # Render external URL, e.g. https://serena-exam-pulse.onrender.com
     external_url = os.getenv("RENDER_EXTERNAL_URL")
-
-    # Secret path for webhook
     webhook_path = os.getenv("WEBHOOK_PATH", f"/webhook/{config.bot_token}")
 
     if external_url:
         webhook_url = external_url.rstrip("/") + webhook_path
     else:
-        # Fallback: agar kisi reason se RENDER_EXTERNAL_URL nahi mila
         webhook_url = os.getenv("WEBHOOK_URL")
         if not webhook_url:
             raise RuntimeError(
