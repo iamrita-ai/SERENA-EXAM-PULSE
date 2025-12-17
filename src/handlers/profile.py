@@ -146,11 +146,14 @@ async def ask_qualifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await update.message.reply_text(
         "5/6 – <b>Qualifications</b> likhiye (multiple allowed):\n"
-        "Har ek line me ek degree likhiye.\n"
+        "Har ek line me <b>alag qualification</b> likhiye.\n\n"
+        "Suggested format:\n"
+        "• Degree / Course – Stream – Year – % (optional)\n"
         "Example:\n"
-        "• B.Tech CSE 2023\n"
-        "• 12th PCM 2019 – 85%\n\n"
-        "Jab sab likh lo, 'done' type kar dein.",
+        "• B.Tech CSE – 2023 – 78%\n"
+        "• 12th PCM – 2020 – 85%\n\n"
+        "Jab sab likh lo, <b>'done'</b> type kar dein.\n"
+        "Agar % nahi likhna chahte to simple bhi likh sakte hain (skip allowed).",
         parse_mode="HTML",
     )
     return ASK_QUALIFICATIONS
@@ -301,4 +304,4 @@ PROFILE_CONV_HANDLER = ConversationHandler(
     ],
     name="profile_wizard",
     persistent=False,
-    )
+)
