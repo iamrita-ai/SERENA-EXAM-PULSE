@@ -1,20 +1,25 @@
-
 from datetime import datetime
 from typing import Dict, Any
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application
+from telegram.error import Forbidden
 
 from ..database import get_users_collection
-from .exams_service import get_eligible_exams_for_user
+from ..models.user import get_all_active_users_cursor, block_user
+from .exams_service import (
+    get_eligible_exams_for_user,
+    build_exam_message_and_keyboard,
+    is_user_eligible_for_exam,
+)
 
 users_col = get_users_collection()
 
 
 async def send_eligibility_alerts(app: Application, user_doc: Dict[str, Any]):
     """
-    Scheduler / hourly job ke through chalne wala function.
-    Pehle se notified exams ko dobara nahi bhejta.
+    Scheduler se chalne wala function:
+    - recent exams (DB) me se user ke liye eligible nikalta hai
+    - jo exams pehle send ho chuke (notified_exam_ids), unko skip karta hai
     """
     eligible = get_eligible_exams_for_user(user_doc)
     if not eligible:
@@ -24,74 +29,11 @@ async def send_eligibility_alerts(app: Application, user_doc: Dict[str, Any]):
     new_ids = []
 
     for exam in eligible:
-        if exam["id"] in already:
+        ex_id = exam.get("exam_id")
+        if not ex_id or ex_id in already:
             continue
 
-        title = exam["title"]
-        ex_type = exam["type"]
-        org = exam["org"]
-        salary = exam.get("salary")
-        notif_date = exam.get("notification_date")
-        form_start = exam.get("form_start")
-        form_end = exam.get("form_end")
-        min_age = exam.get("min_age")
-        max_age = exam.get("max_age")
-        details = exam.get("details")
-
-        lines = [
-            f"📢 <b>{title}</b>",
-            f"🏛 <b>Type:</b> {ex_type}   |   🏢 <b>Org:</b> {org}",
-        ]
-
-        if salary:
-            lines.append(f"💰 <b>Salary:</b> {salary}")
-
-        if notif_date:
-            lines.append(f"📅 <b>Notification:</b> {notif_date}")
-
-        if form_start or form_end:
-            form_parts = []
-            if form_start:
-                form_parts.append(f"Start: {form_start}")
-            if form_end:
-                form_parts.append(f"Last Date: {form_end}")
-            lines.append("📝 <b>Form Dates:</b> " + " | ".join(form_parts))
-
-        if min_age or max_age:
-            age_parts = []
-            if min_age:
-                age_parts.append(f"Min {min_age}")
-            if max_age:
-                age_parts.append(f"Max {max_age}")
-            lines.append("🎯 <b>Age Limit:</b> " + " | ".join(age_parts))
-
-        if details:
-            lines.append("")
-            lines.append(details)
-
-        text = "\n".join(lines)
-
-        buttons_row = []
-        apply_link = exam.get("apply_link")
-        if apply_link:
-            buttons_row.append(
-                InlineKeyboardButton(
-                    "🔗 Apply Now",
-                    url=apply_link.strip(),
-                )
-            )
-
-        source_link = exam.get("source_link")
-        if source_link:
-            buttons_row.append(
-                InlineKeyboardButton(
-                    "📄 Official Notification",
-                    url=source_link.strip(),
-                )
-            )
-
-        kb = InlineKeyboardMarkup([buttons_row]) if buttons_row else None
-
+        text, kb = build_exam_message_and_keyboard(exam)
         await app.bot.send_message(
             chat_id=user_doc["tg_id"],
             text=text,
@@ -99,7 +41,7 @@ async def send_eligibility_alerts(app: Application, user_doc: Dict[str, Any]):
             reply_markup=kb,
             disable_web_page_preview=True,
         )
-        new_ids.append(exam["id"])
+        new_ids.append(ex_id)
 
     if new_ids:
         users_col.update_one(
@@ -108,4 +50,50 @@ async def send_eligibility_alerts(app: Application, user_doc: Dict[str, Any]):
                 "$addToSet": {"notified_exam_ids": {"$each": new_ids}},
                 "$set": {"last_notified_at": datetime.utcnow()},
             },
+        )
+
+
+async def notify_users_about_new_exam(app: Application, exam_doc: Dict[str, Any]):
+    """
+    Jab channel me new exam post aaye:
+    - turant sab users me se eligible users ko yeh exam bhej do
+    - user's notified_exam_ids me exam_id add karo
+    """
+    ex_id = exam_doc.get("exam_id")
+    if not ex_id:
+        return
+
+    cursor = get_all_active_users_cursor()
+    for user_doc in cursor:
+        tg_id = user_doc["tg_id"]
+        try:
+            if not is_user_eligible_for_exam(user_doc, exam_doc):
+                continue
+
+            already = set(user_doc.get("notified_exam_ids") or [])
+            if ex_id in already:
+                continue
+
+            text, kb = build_exam_message_and_keyboard(exam_doc)
+            await app.bot.send_message(
+                chat_id=tg_id,
+                text=text,
+                parse_mode="HTML",
+                reply_markup=kb,
+                disable_web_page_preview=True,
             )
+
+            users_col.update_one(
+                {"tg_id": tg_id},
+                {
+                    "$addToSet": {"notified_exam_ids": ex_id},
+                    "$set": {"last_notified_at": datetime.utcnow()},
+                },
+            )
+
+        except Forbidden:
+            # User ne bot block kar diya
+            block_user(tg_id, reason="blocked_during_new_exam_notify")
+        except Exception:
+            # baaki errors ko ignore, logs scheduler me aa jayenge
+            continue
