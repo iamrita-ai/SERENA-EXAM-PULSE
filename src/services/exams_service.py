@@ -10,10 +10,23 @@ SAMPLE_EXAMS: List[Dict[str, Any]] = [
         "org": "Staff Selection Commission",
         "min_age": 18,
         "max_age": 32,
-        "required_qualifications_keywords": ["graduation", "bachelor", "b.sc", "b.com", "b.a"],
+        "required_qualifications_keywords": [
+            "graduation",
+            "bachelor",
+            "b.sc",
+            "b.com",
+            "b.a",
+        ],
         "states": [],
         "salary": "Approx ₹50,000 - ₹1,50,000 per month",
-        "apply_link": "https://ssc.nic.in/",
+        # Apply form link (example)
+        "apply_link": "https://ssc.nic.in",
+        # Official notification / information link
+        "source_link": "https://ssc.nic.in",
+        # Extra info (string format, tum apne hisaab se change kar sakte ho)
+        "notification_date": "Expected: May 2025",
+        "form_start": "To be announced",
+        "form_end": "To be announced",
         "details": "All India graduate level exam for various Group B & C posts.",
     },
     {
@@ -23,10 +36,17 @@ SAMPLE_EXAMS: List[Dict[str, Any]] = [
         "org": "IBPS",
         "min_age": 20,
         "max_age": 30,
-        "required_qualifications_keywords": ["graduation", "bachelor"],
+        "required_qualifications_keywords": [
+            "graduation",
+            "bachelor",
+        ],
         "states": [],
         "salary": "Approx ₹45,000 - ₹70,000 per month",
-        "apply_link": "https://ibps.in/",
+        "apply_link": "https://ibps.in",
+        "source_link": "https://ibps.in",
+        "notification_date": "Expected: August 2025",
+        "form_start": "To be announced",
+        "form_end": "To be announced",
         "details": "Probationary Officer recruitment in public sector banks.",
     },
     {
@@ -36,10 +56,20 @@ SAMPLE_EXAMS: List[Dict[str, Any]] = [
         "org": "Private IT Firm",
         "min_age": 18,
         "max_age": 30,
-        "required_qualifications_keywords": ["b.tech", "bca", "mca", "b.sc cs", "python"],
+        "required_qualifications_keywords": [
+            "b.tech",
+            "bca",
+            "mca",
+            "b.sc cs",
+            "python",
+        ],
         "states": ["karnataka", "maharashtra", "delhi"],
         "salary": "₹3 LPA - ₹6 LPA",
         "apply_link": "https://example.com/apply/python-dev",
+        "source_link": "https://example.com/jobs/python-dev",
+        "notification_date": "Currently Hiring",
+        "form_start": "Applications Open",
+        "form_end": "Till position filled",
         "details": "Entry-level Python developer role. Good for freshers.",
     },
 ]
@@ -80,7 +110,7 @@ def get_eligible_exams_for_user(user_doc: Dict[str, Any]) -> List[Dict[str, Any]
         if kw and not any(k in quals_text for k in kw):
             continue
 
-        states = [s.lower() for s in exam.get("states") or []]
+        states = [s.lower() for s in (exam.get("states") or [])]
         if states and state and state not in states:
             continue
 
