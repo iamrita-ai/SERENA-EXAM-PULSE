@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
 from telegram.error import Forbidden, BadRequest
+
 from ..config import config
 
 
@@ -9,12 +10,12 @@ async def ensure_subscribed(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> bool:
     """
-    True: user ne channel join kiya hua hai
-    False: user ko join karne ka message bhej diya, aage ka code mat chalao
+    True  -> user ne required channel join kiya hua hai
+    False -> user ko join karne ka message bhej diya, baaki handler ko aage mat chalao
     """
     channel = config.force_sub_channel
     if not channel:
-        # agar FORCE_SUB_CHANNEL set nahi kiya hua to force-sub disable
+        # Agar FORCE_SUB_CHANNEL set nahi kiya hua to force-sub disable
         return True
 
     user = update.effective_user
@@ -23,8 +24,15 @@ async def ensure_subscribed(
     try:
         member = await bot.get_chat_member(chat_id=channel, user_id=user.id)
 
-        # Agar user left / kicked hua to force-sub message dikhao
-        if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED):
+        # PTB 20/21 versions me statuses ka naam change ho sakta hai.
+        # Hum LEFT + (KICKED ya BANNED jo bhi available ho) ko "not joined" manenge.
+        bad_statuses = {ChatMemberStatus.LEFT}
+        if hasattr(ChatMemberStatus, "KICKED"):
+            bad_statuses.add(ChatMemberStatus.KICKED)
+        if hasattr(ChatMemberStatus, "BANNED"):
+            bad_statuses.add(ChatMemberStatus.BANNED)
+
+        if member.status in bad_statuses:
             raise Forbidden("user not joined")
 
         # Member / admin / owner etc. -> allowed
@@ -44,7 +52,8 @@ async def ensure_subscribed(
             [
                 [
                     InlineKeyboardButton(
-                        "📢 Join Serena Channel", url=link
+                        "📢 Join Serena Channel",
+                        url=link,
                     )
                 ]
             ]
@@ -53,11 +62,14 @@ async def ensure_subscribed(
         # message / callback dono case handle karein
         if update.effective_message:
             await update.effective_message.reply_text(
-                text, reply_markup=keyboard
+                text,
+                reply_markup=keyboard,
             )
         else:
             await bot.send_message(
-                chat_id=user.id, text=text, reply_markup=keyboard
+                chat_id=user.id,
+                text=text,
+                reply_markup=keyboard,
             )
 
         return False
