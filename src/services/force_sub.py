@@ -24,8 +24,7 @@ async def ensure_subscribed(
     try:
         member = await bot.get_chat_member(chat_id=channel, user_id=user.id)
 
-        # PTB 20/21 versions me statuses ka naam change ho sakta hai.
-        # Hum LEFT + (KICKED ya BANNED jo bhi available ho) ko "not joined" manenge.
+        # PTB 20/21 me statuses ka naming change ho sakta hai.
         bad_statuses = {ChatMemberStatus.LEFT}
         if hasattr(ChatMemberStatus, "KICKED"):
             bad_statuses.add(ChatMemberStatus.KICKED)
@@ -40,12 +39,12 @@ async def ensure_subscribed(
 
     except (Forbidden, BadRequest):
         # Channel join link
-        # Agar CHANNEL_LINK env me diya hai to woh use hoga, warna username se banayenge
         link = config.channel_link or f"https://t.me/{str(channel).lstrip('@')}"
 
         text = (
             "⚠️ Pehle hamara official channel join karna zaroori hai.\n\n"
-            "✅ Channel join karne ke baad /start dubara type karein."
+            "✅ Channel join karne ke baad /start dubara type karein.\n\n"
+            "Agar koi issue aaye to Owner se contact kar sakte hain."
         )
 
         keyboard = InlineKeyboardMarkup(
@@ -54,12 +53,15 @@ async def ensure_subscribed(
                     InlineKeyboardButton(
                         "📢 Join Serena Channel",
                         url=link,
-                    )
+                    ),
+                    InlineKeyboardButton(
+                        "👤 Owner Contact",
+                        url=f"https://t.me/{config.owner_username}",
+                    ),
                 ]
             ]
         )
 
-        # message / callback dono case handle karein
         if update.effective_message:
             await update.effective_message.reply_text(
                 text,
