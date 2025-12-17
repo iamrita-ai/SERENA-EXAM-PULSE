@@ -1,5 +1,3 @@
-import os
-
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -29,24 +27,28 @@ def main():
 
     # ---------------- Handlers ---------------- #
 
-    # Channel exam feed handler (must be before generic message handlers, but yahan koi generic nahi)
+    # 1) Tumhare EXAM_FEED_CHANNEL ke liye handler:
+    # Sirf channel_post updates handle karega (users ke chats nahi)
     application.add_handler(
-        MessageHandler(filters.ALL, exam_channel_post_handler)
+        MessageHandler(
+            filters.UpdateType.CHANNEL_POST,
+            exam_channel_post_handler,
+        )
     )
 
-    # User commands
+    # 2) User commands
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("profile", profile_view_command))
     application.add_handler(CommandHandler("settings", settings_command))
 
-    # Jobs / Govt Exams list (current eligibility)
+    # 3) Jobs / Govt Exams list (current eligibility)
     application.add_handler(CommandHandler(["jobs", "job"], jobs_command))
 
-    # Profile conversation (create/edit)
+    # 4) Profile conversation (create/edit)
     application.add_handler(PROFILE_CONV_HANDLER)
 
-    # Settings inline callbacks
+    # 5) Settings inline callbacks
     application.add_handler(
         CallbackQueryHandler(
             settings_callback,
@@ -54,35 +56,21 @@ def main():
         )
     )
 
-    # Admin commands
+    # 6) Admin commands
     application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("users", users_command))
     application.add_handler(CommandHandler("broadcast", broadcast_command))
 
-    # Scheduler jobs (hourly/daily)
+    # 7) Scheduler jobs (hourly/daily)
     setup_scheduled_jobs(application)
 
-    # ---------------- Webhook Config for Render ---------------- #
+    # ---------------- Long Polling ---------------- #
 
-    port = int(os.getenv("PORT", "8000"))
-    external_url = os.getenv("RENDER_EXTERNAL_URL")
-    webhook_path = os.getenv("WEBHOOK_PATH", f"/webhook/{config.bot_token}")
-
-    if external_url:
-        webhook_url = external_url.rstrip("/") + webhook_path
-    else:
-        webhook_url = os.getenv("WEBHOOK_URL")
-        if not webhook_url:
-            raise RuntimeError(
-                "WEBHOOK_URL ya RENDER_EXTERNAL_URL env variable set karo "
-                "taaki webhook URL generate ho sake."
-            )
-
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path=webhook_path.lstrip("/"),
-        webhook_url=webhook_url,
+    # Long polling se bot Telegram se updates le raha hoga.
+    # Background Worker ke liye ye best hai.
+    application.run_polling(
+        # Agar channel_post ke updates bhi chahiye:
+        allowed_updates=["message", "callback_query", "channel_post"],
         drop_pending_updates=True,
     )
 
