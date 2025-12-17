@@ -1,14 +1,16 @@
 import logging
-from datetime import time, timezone
+from datetime import time, timezone, datetime, timedelta
 
 from telegram.error import Forbidden
 from telegram.ext import Application, ContextTypes
 
 from ..config import config
 from ..models.user import get_all_active_users_cursor, block_user
-from .notifications import send_eligibility_alerts
+from ..services.notifications import send_eligibility_alerts
+from ..database import get_exams_collection
 
 logger = logging.getLogger(__name__)
+exams_col = get_exams_collection()
 
 
 async def hourly_notifications_job(context: ContextTypes.DEFAULT_TYPE):
@@ -28,14 +30,13 @@ async def hourly_notifications_job(context: ContextTypes.DEFAULT_TYPE):
             await send_eligibility_alerts(app, user_doc)
             count += 1
         except Forbidden:
-            # User ne bot block kar diya
             block_user(tg_id, reason="blocked_during_hourly")
             blocked += 1
         except Exception as e:
             logger.error("Error sending notification to %s: %s", tg_id, e)
 
     logger.info(
-        "Hourly notifications job done. Notified=%s, newly_blocked=%s",
+        "Hourly notifications job done. Notified_checked_users=%s, newly_blocked=%s",
         count,
         blocked,
     )
@@ -43,18 +44,23 @@ async def hourly_notifications_job(context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_maintenance_job(context: ContextTypes.DEFAULT_TYPE):
     """
-    Roz ek baar chalne wala job:
-    - future me: scrape new exams
-    - purane data cleanup
-    - summary logs etc.
+    Roz ek baar:
+    - 30 din se purane exams ko delete karo (storage free rakhne ke liye)
+    - optional log message
     """
-    logger.info("Daily maintenance job executed.")
+    now = datetime.utcnow()
+    cutoff = now - timedelta(days=30)
+    res = exams_col.delete_many({"created_at": {"$lt": cutoff}})
+    deleted = res.deleted_count
+
+    logger.info("Daily maintenance: removed %s old exams (older than 30 days).", deleted)
 
     if config.log_channel_id:
         try:
             await context.bot.send_message(
                 chat_id=config.log_channel_id,
-                text="🕒 Daily maintenance job executed.",
+                text=f"🕒 Daily maintenance executed.\n🗑 Removed <b>{deleted}</b> old exams (30+ days).",
+                parse_mode="HTML",
             )
         except Exception as e:
             logger.error("Failed to send daily maintenance log: %s", e)
@@ -67,10 +73,9 @@ def setup_scheduled_jobs(application: Application):
     job_queue = application.job_queue
 
     if job_queue is None:
-        # Agar python-telegram-bot[job-queue] install nahi hoga to yahan aayega.
         logger.warning(
             "JobQueue is not available. Scheduler disabled. "
-            "Install PTB with job-queue extra: pip install \"python-telegram-bot[job-queue]\""
+            'Install PTB with job-queue extra: pip install "python-telegram-bot[webhooks,job-queue]"'
         )
         return
 
@@ -78,7 +83,7 @@ def setup_scheduled_jobs(application: Application):
     job_queue.run_repeating(
         hourly_notifications_job,
         interval=3600,  # seconds
-        first=10,       # bot start hone ke 10s baad first run
+        first=30,       # bot start hone ke 30s baad first run
         name="hourly_notifications",
     )
 
