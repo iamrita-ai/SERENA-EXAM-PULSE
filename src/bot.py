@@ -1,8 +1,15 @@
+import os
+import threading
+import http.server
+import socketserver
+import logging
+
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
     MessageHandler,
+    ChannelPostHandler,
     filters,
 )
 
@@ -18,22 +25,54 @@ from .handlers.feed import exam_channel_post_handler
 from .services.scheduler import setup_scheduled_jobs
 
 
+logger = logging.getLogger(__name__)
+
+
+def start_health_http_server():
+    """
+    Render ke Web Service ko ek HTTP port open chahiye.
+    Ye lightweight HTTP server sirf health check ke liye chalaya jaa raha hai.
+    Bot Telegram se long-polling se updates lega.
+    """
+    port = int(os.getenv("PORT", "8000"))
+
+    class HealthHandler(http.server.SimpleHTTPRequestHandler):
+        # Logging ko thoda clean rakhne ke liye override
+        def log_message(self, format, *args):
+            logger.info("Health HTTP: " + format % args)
+
+        def do_GET(self):
+            # Simple 200 OK response for any path (/, /health, etc.)
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"OK")
+
+    try:
+        with socketserver.TCPServer(("", port), HealthHandler) as httpd:
+            logger.info("Health HTTP server running on port %s", port)
+            httpd.serve_forever()
+    except OSError as e:
+        logger.error("Failed to start health HTTP server on port %s: %s", port, e)
+
+
 def main():
-    # Logging
+    # Logging setup
     setup_logging()
 
-    # Application (PTB 20/21 style)
+    # Health HTTP server ko ek alag thread me start karo
+    health_thread = threading.Thread(target=start_health_http_server, daemon=True)
+    health_thread.start()
+
+    # Telegram Application (PTB 20/21 style)
     application = Application.builder().token(config.bot_token).build()
 
     # ---------------- Handlers ---------------- #
 
     # 1) Tumhare EXAM_FEED_CHANNEL ke liye handler:
-    # Sirf channel_post updates handle karega (users ke chats nahi)
+    # Sirf channel_post updates handle karega (users ke chats ko affect nahi karega)
     application.add_handler(
-        MessageHandler(
-            filters.UpdateType.CHANNEL_POST,
-            exam_channel_post_handler,
-        )
+        ChannelPostHandler(exam_channel_post_handler)
     )
 
     # 2) User commands
@@ -64,12 +103,11 @@ def main():
     # 7) Scheduler jobs (hourly/daily)
     setup_scheduled_jobs(application)
 
-    # ---------------- Long Polling ---------------- #
+    # ---------------- Long Polling (no webhook) ---------------- #
 
-    # Long polling se bot Telegram se updates le raha hoga.
-    # Background Worker ke liye ye best hai.
+    # Long polling se bot Telegram se updates lega.
+    # Render ka Web Service health check upar wale HTTP server se satisfy ho jayega.
     application.run_polling(
-        # Agar channel_post ke updates bhi chahiye:
         allowed_updates=["message", "callback_query", "channel_post"],
         drop_pending_updates=True,
     )
