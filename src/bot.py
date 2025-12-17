@@ -52,22 +52,19 @@ def main():
 
     # ---------------- Webhook Config for Render ---------------- #
 
-    # Render automatically set karega PORT env var
+    # Render automatically PORT env var set karta hai
     port = int(os.getenv("PORT", "8000"))
 
     # Render external URL, e.g. https://serena-exam-pulse.onrender.com
     external_url = os.getenv("RENDER_EXTERNAL_URL")
 
-    # Secret path for webhook (Telegram ispe POST karega)
-    # Chaaho to isko env se bhi de sakte ho (WEBHOOK_PATH), warna ye default:
+    # Secret path for webhook
     webhook_path = os.getenv("WEBHOOK_PATH", f"/webhook/{config.bot_token}")
 
     if external_url:
-        # Ensure no double slash
         webhook_url = external_url.rstrip("/") + webhook_path
     else:
-        # Agar kisi reason se RENDER_EXTERNAL_URL nahi mil raha,
-        # to manually WEBHOOK_URL env me full URL de sakte ho
+        # Fallback: agar kisi reason se RENDER_EXTERNAL_URL nahi mila
         webhook_url = os.getenv("WEBHOOK_URL")
         if not webhook_url:
             raise RuntimeError(
@@ -75,12 +72,11 @@ def main():
                 "taaki webhook URL generate ho sake."
             )
 
-    # Bot ko webhook mode me run karo
     application.run_webhook(
         listen="0.0.0.0",
         port=port,
-        url_path=webhook_path.lstrip("/"),  # local path
-        webhook_url=webhook_url,            # Telegram ke liye public URL
+        url_path=webhook_path.lstrip("/"),
+        webhook_url=webhook_url,
         drop_pending_updates=True,
     )
 
