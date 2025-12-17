@@ -13,6 +13,7 @@ from .handlers.help import help_command
 from .handlers.profile import profile_view_command, PROFILE_CONV_HANDLER
 from .handlers.settings import settings_command, settings_callback
 from .handlers.admin import status_command, users_command, broadcast_command
+from .handlers.jobs import jobs_command
 from .services.scheduler import setup_scheduled_jobs
 
 
@@ -30,6 +31,9 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("profile", profile_view_command))
     application.add_handler(CommandHandler("settings", settings_command))
+
+    # Jobs / Govt Exams list (current eligibility)
+    application.add_handler(CommandHandler(["jobs", "job"], jobs_command))
 
     # Profile conversation (create/edit)
     application.add_handler(PROFILE_CONV_HANDLER)
