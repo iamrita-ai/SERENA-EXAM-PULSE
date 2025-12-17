@@ -7,15 +7,16 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+
 from ..models.user import get_user_by_tg_id, upsert_user_profile, is_blocked
 from ..services.logging_service import send_profile_log
 
-ASK_NAME, ASK_STATE, ASK_CATEGORY, ASK_AGE, ASK_QUALIFICATIONS, ASK_EXTRA, CONFIRM_PROFILE = range(
-    7
-)
+# Conversation states
+ASK_NAME, ASK_STATE, ASK_CATEGORY, ASK_AGE, ASK_QUALIFICATIONS, ASK_EXTRA, CONFIRM_PROFILE = range(7)
 
 
 async def profile_view_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User ki saved profile dikhata hai."""
     user = update.effective_user
     if is_blocked(user.id):
         return
@@ -45,6 +46,7 @@ async def profile_view_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 def build_profile_text(user_doc: dict) -> str:
+    """User profile ko pretty text me convert kare."""
     lines = [
         "👤 <b>Aapki Exam Profile</b>",
         "",
@@ -53,6 +55,7 @@ def build_profile_text(user_doc: dict) -> str:
         f"<b>Category:</b> {user_doc.get('category')}",
         f"<b>Age:</b> {user_doc.get('age')}",
     ]
+
     quals = user_doc.get("qualifications", [])
     if quals:
         lines.append("<b>Qualifications:</b>")
@@ -72,6 +75,7 @@ def build_profile_text(user_doc: dict) -> str:
 # ---------- Profile Wizard Helpers ----------
 
 def _get_message_from_update(update: Update):
+    """Message object nikaal lo chahe /command se aaye ya callback se."""
     if update.message:
         return update.message
     if update.callback_query:
@@ -80,7 +84,10 @@ def _get_message_from_update(update: Update):
 
 
 async def start_profile_wizard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Entry point for create/edit profile (via button or /editprofile)."""
+    """
+    Entry point for create/edit profile (via /editprofile command
+    ya 'Create / Edit Profile' / 'Edit Profile' button).
+    """
     tg_user = update.effective_user
     if is_blocked(tg_user.id):
         return ConversationHandler.END
@@ -89,6 +96,7 @@ async def start_profile_wizard(update: Update, context: ContextTypes.DEFAULT_TYP
     if update.callback_query:
         await update.callback_query.answer()
 
+    # Temporary data store
     context.user_data["profile_wizard"] = {"qualifications": []}
 
     await msg.reply_text(
@@ -120,7 +128,8 @@ async def ask_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["profile_wizard"]["category"] = update.message.text.strip()
     await update.message.reply_text(
-        "4/6 – <b>Age</b> (sirf number likhiye, jaise 23):", parse_mode="HTML"
+        "4/6 – <b>Age</b> (sirf number likhiye, jaise 23):",
+        parse_mode="HTML",
     )
     return ASK_AGE
 
@@ -149,7 +158,7 @@ async def ask_qualifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def collect_qualification(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    if text.lower() in ("done", "ho gya", "ho gaya", "finish"):
+    if text.lower() in ("done", "ho gya", "ho gaya", "finish", "ho gaya hai"):
         return await ask_extra_details(update, context)
 
     context.user_data["profile_wizard"]["qualifications"].append(text)
@@ -216,6 +225,7 @@ async def confirm_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_profile_confirm_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ):
+    """Inline buttons: Save / Cancel."""
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -235,7 +245,7 @@ async def handle_profile_confirm_callback(
             "Ab bot aapko eligibility-based exams & jobs ki notifications bhejega."
         )
 
-        # Send profile log to logs channel
+        # Logs channel me resume-style profile bhejo
         await send_profile_log(context.application, user_doc)
 
         context.user_data.pop("profile_wizard", None)
@@ -245,15 +255,20 @@ async def handle_profile_confirm_callback(
 
 
 async def cancel_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Fallback /cancel."""
     context.user_data.pop("profile_wizard", None)
     await update.effective_message.reply_text("❌ Profile wizard cancel kar diya gaya.")
     return ConversationHandler.END
 
 
+# ConversationHandler object jise bot.py me add kiya gaya hai
 PROFILE_CONV_HANDLER = ConversationHandler(
     entry_points=[
         CommandHandler("editprofile", start_profile_wizard),
-        CallbackQueryHandler(start_profile_wizard, pattern="^(create_profile|settings_edit_profile)$"),
+        CallbackQueryHandler(
+            start_profile_wizard,
+            pattern="^(create_profile|settings_edit_profile)$",
+        ),
     ],
     states={
         ASK_NAME: [
@@ -286,4 +301,8 @@ PROFILE_CONV_HANDLER = ConversationHandler(
     ],
     name="profile_wizard",
     persistent=False,
-      )
+    # PTB warning avoid karne ke liye:
+    per_chat=True,
+    per_user=True,
+    per_message=True,
+    )
