@@ -301,8 +301,6 @@ PROFILE_CONV_HANDLER = ConversationHandler(
     ],
     name="profile_wizard",
     persistent=False,
-    # PTB warning avoid karne ke liye:
-    per_chat=True,
-    per_user=True,
-    per_message=True,
+    # per_chat & per_user defaults PTB handle karega,
+    # per_message use nahi kar rahe -> warning khatam.
     )
