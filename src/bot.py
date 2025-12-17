@@ -1,3 +1,5 @@
+import os
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -15,11 +17,13 @@ from .services.scheduler import setup_scheduled_jobs
 
 
 def main():
-    # Logging setup
+    # Logging
     setup_logging()
 
-    # Application builder (PTB 20+ / 21+ style)
+    # Application (PTB 20/21 style)
     application = Application.builder().token(config.bot_token).build()
+
+    # ---------------- Handlers ---------------- #
 
     # User commands
     application.add_handler(CommandHandler("start", start_command))
@@ -46,8 +50,39 @@ def main():
     # Scheduler jobs (hourly/daily)
     setup_scheduled_jobs(application)
 
-    # Start long polling
-    application.run_polling()
+    # ---------------- Webhook Config for Render ---------------- #
+
+    # Render automatically set karega PORT env var
+    port = int(os.getenv("PORT", "8000"))
+
+    # Render external URL, e.g. https://serena-exam-pulse.onrender.com
+    external_url = os.getenv("RENDER_EXTERNAL_URL")
+
+    # Secret path for webhook (Telegram ispe POST karega)
+    # Chaaho to isko env se bhi de sakte ho (WEBHOOK_PATH), warna ye default:
+    webhook_path = os.getenv("WEBHOOK_PATH", f"/webhook/{config.bot_token}")
+
+    if external_url:
+        # Ensure no double slash
+        webhook_url = external_url.rstrip("/") + webhook_path
+    else:
+        # Agar kisi reason se RENDER_EXTERNAL_URL nahi mil raha,
+        # to manually WEBHOOK_URL env me full URL de sakte ho
+        webhook_url = os.getenv("WEBHOOK_URL")
+        if not webhook_url:
+            raise RuntimeError(
+                "WEBHOOK_URL ya RENDER_EXTERNAL_URL env variable set karo "
+                "taaki webhook URL generate ho sake."
+            )
+
+    # Bot ko webhook mode me run karo
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=webhook_path.lstrip("/"),  # local path
+        webhook_url=webhook_url,            # Telegram ke liye public URL
+        drop_pending_updates=True,
+    )
 
 
 if __name__ == "__main__":
