@@ -1,8 +1,9 @@
+
 import os
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
-# Local development ke liye .env support (Render par env vars se hi kaam hoga)
+# Local development ke liye .env support
 load_dotenv()
 
 
@@ -17,7 +18,7 @@ class Config:
         default_factory=lambda: os.getenv("MONGO_DB_NAME", "serena_exam_pulse")
     )
 
-    # Optional: agar future me Pyrogram / MTProto use karna ho
+    # Optional: future Pyrogram / MTProto use ke liye
     api_id: int = field(
         default_factory=lambda: int(os.getenv("API_ID", "0"))
     )
@@ -28,13 +29,13 @@ class Config:
     # Admin IDs (comma separated)
     admin_ids: list[int] = field(
         default_factory=lambda: [
-            int(x) for x in os.getenv("ADMIN_IDS", "6518065496").split(",") if x.strip()
+            int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()
         ]
     )
 
     # Logs ke liye channel/group ID (negative ID for channel)
     log_channel_id: int = field(
-        default_factory=lambda: int(os.getenv("LOG_CHANNEL_ID", "-1003286415377"))
+        default_factory=lambda: int(os.getenv("LOG_CHANNEL_ID", "0"))
     )
 
     # Owner contact (username without @)
@@ -46,16 +47,19 @@ class Config:
     channel_link: str = field(
         default_factory=lambda: os.getenv(
             "CHANNEL_LINK",
-            "https://t.me/serenaunzipbot",  # default tumhara channel
+            "https://t.me/serenaunzipbot",  # default
         )
     )
 
     # Force Subscribe channel (username ya numeric ID)
-    # Example: "@serenaunzipbot" ya "-1001234567890"
     force_sub_channel: str = field(
-        default_factory=lambda: os.getenv(
-            "FORCE_SUB_CHANNEL", "@serenaunzipbot"
-        )
+        default_factory=lambda: os.getenv("FORCE_SUB_CHANNEL", "@serenaunzipbot")
+    )
+
+    # EXAM / JOB FEED CHANNEL (tumhara apna channel jahan tum notifications daaloge)
+    # Example: -1001234567890
+    exam_feed_channel_id: int = field(
+        default_factory=lambda: int(os.getenv("EXAM_FEED_CHANNEL_ID", "0"))
     )
 
 
